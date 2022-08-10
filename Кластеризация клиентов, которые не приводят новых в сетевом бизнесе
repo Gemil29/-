@@ -1,0 +1,273 @@
+import pandas as pd
+import numpy as np
+import warnings
+warnings.simplefilter('ignore')
+import seaborn as sns
+import matplotlib.pyplot as plt
+#Импорт данных
+def my_data():
+    df = pd.read_csv('//33_Галимуллин//выгрузки//тестовые//Консультанты под которыми нету новичков.csv', sep = ',', delimiter = ";")
+    df_columns = 'id,rank,fg0,fg1,fg2,fg3,period,country,qty,rub'.split(',')
+    df.columns =  df_columns
+        
+    return df
+df1 = my_data()
+df1.head()
+
+def my_data1():
+    df = pd.read_csv('//faberlic.ru//ru//Департаменты//Отдел планирования//Analitik//Группа аналитики//Отчетность//33_Галимуллин//выгрузки//тестовые//Консультанты под которыми нету новичков v2.csv', sep = ',', delimiter = ";")
+    df_columns = 'id,rank,fg0,fg1,fg2,fg3,period,country,qty,rub'.split(',')
+    df.columns =  df_columns
+        
+    return df
+df = my_data1()
+df.head()
+
+# Средняя закупка в руб и шт 
+def new_data(df):
+    data = df.pivot_table(index = ['id'], 
+                          columns = ['period'],
+                          aggfunc = {#'period': pd.Series.nunique,
+                                     'qty' : np.sum,
+#                                      'rub' : np.sum
+                                    }
+                         ).reset_index().fillna(0)
+    count_period = len(df.period.unique())  #Количество периодов
+    lst_columns = []
+    for i in data.columns:
+        if i[1] == '':
+            lst_columns.append(i[0])
+        else:
+            lst_columns.append(i[1])
+    data.columns = lst_columns
+    describe = data.describe()
+    describe['means'] = describe.iloc[:,1:].mean(axis = 1)
+    meanQty =  pd.DataFrame(describe.iloc[1,1:-2])
+
+    data1 = df.pivot_table(index = ['id'], 
+                          columns = ['period'],
+                          aggfunc = {#'period': pd.Series.nunique,
+    #                                      'qty' : np.sum,
+                                     'rub' : np.sum
+                                    }
+                         ).reset_index().fillna(0)
+    #     count_period = len(df.period.unique())  #Количество периодов
+    lst_columns1 = []
+    for i in data1.columns:
+        if i[1] == '':
+            lst_columns1.append(i[0])
+        else:
+            lst_columns1.append(i[1])
+    data1.columns = lst_columns1
+    describe1 = data1.describe()
+    describe1['means'] = describe1.iloc[:,1:].mean(axis = 1)
+    meanRub =  pd.DataFrame(describe1.iloc[1,1:-2])
+    Q = meanQty   
+    R = meanRub
+    mean_periods = pd.concat([Q,R], axis = 1).reset_index()
+    mean_periods.columns = 'periods,meanQty,meanRub'.split(',')
+    
+    return mean_periods
+
+data = new_data(df)
+data
+
+# Динамика средней закупки в шт
+fig = plt.figure()
+axes = fig.add_axes([0,1,1.5,1.5])
+
+ax = sns.lineplot(x = data['periods'], y = data['meanQty'], color = 'blue')
+plt.setp(ax.get_xticklabels(), rotation = 45)
+ax.set_title('Среднее кол-во товаров в период')
+# ax.set_ylable('CountConsultants')
+
+# Динамика средней закупки в руб
+fig = plt.figure()
+axes = fig.add_axes([0,1,1.5,1.5])
+
+ax = sns.lineplot(x = data['periods'], y = data['meanRub'], color = 'red')
+plt.setp(ax.get_xticklabels(), rotation = 45)
+ax.set_title('Средняя сумма закупки в период')
+# ax.set_ylable('CountConsultants
+
+# Количество консультантов покупающих каждый период
+d = df.pivot_table(index = ['id', 'period'],
+                    aggfunc = {'qty': np.sum }
+                    ).reset_index()
+f = d.groupby('period')['id'].nunique().reset_index().iloc[:-1,:]
+
+
+print("Количество консультантов, покупающих каждый период")
+fig = plt.figure()
+axes = fig.add_axes([0,1,2,1.5])
+
+# axes.bar( x = f['period'], y = f['id'])
+ax = sns.barplot(x = f['period'], y = f['id'], color = 'blue')
+plt.setp(ax.get_xticklabels(), rotation=45)
+ax.set_title('CountConsultants')
+# ax.set_ylable('CountConsultants')
+
+# Распределение Количества периодов
+d1 = d.groupby(['id']).count().reset_index()
+d1 = d1.sort_values( ascending = False, by = 'period')
+fig = plt.figure()
+axes = fig.add_axes([0,1,2,1.5])
+sns.distplot(x = d1['period'])
+
+d2 = d1[d1['qty'] >= 27]
+d2['marker'] = 1
+d2
+weird_people = df.merge(d2[['id', 'marker']], how = 'left', on = 'id')
+weird_people = weird_people[weird_people['marker'] == 1] 
+weird_people_pivot = weird_people.pivot_table(index = 'fg1'
+#                                              , columns = 'period'
+                                             , aggfunc = {'qty': np.mean }
+#                                              , margins = True 
+                                              
+                                             ).fillna(0).reset_index()
+
+# weird_people_pivot
+weird_people_pivot = weird_people_pivot.sort_values(ascending = False, by = 'qty')
+fig = plt.figure()
+axes = fig.add_axes([0,1,2,1.5])
+wp = sns.barplot(x = weird_people_pivot['qty'], y = weird_people_pivot['fg1'] , color = 'green')
+wp.set_title('Средняя закупка "странных консультантов"')
+
+df1 = df.copy()
+# df1['lgqty'] = np.log(df1['qty'])
+pivot = df1.pivot_table(  index = 'id',
+                         columns = 'fg1',
+                         aggfunc = {'qty': np.mean }
+                       ).reset_index().fillna(0)
+lst = []
+for j in pivot.columns:
+    if j[1] == '':
+        lst.append(j[0])
+    else:
+        lst.append(j[1])
+pivot.columns = lst
+pivot['all_qty'] = pivot.iloc[:, 1:].sum(axis = 1)
+
+pivot.head(7)
+
+        
+#Применим кластеризация методом к- средних
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+scaler = StandardScaler()
+new_pivot = pivot.iloc[:,1:]
+
+# приравнивание среднего значения к нулю и/или приравнивание стандартного отклонения к единице
+sc_data = scaler.fit(new_pivot).transform(new_pivot)
+# Массив np
+x = np.array(sc_data)
+# Применяем k-means
+kmeans = KMeans(n_clusters = 4, random_state=0).fit(x)
+# Кластеры
+label_cluster = kmeans.labels_
+new_pivot['clusters'] = label_cluster
+new_pivot.head()
+
+
+# Центры кластеров (Ядра)
+centers_cluster = new_pivot.groupby(['clusters']).mean().sort_values(ascending = False, by = 'all_qty').reset_index()
+# Количество человек в кластерах
+cluster_size = pd.DataFrame(new_pivot.groupby(['clusters']).size().sort_values(ascending = False)).reset_index()
+cluster_size.columns = ['clusters', 'count_consultans']
+# cluster_size
+clusters = centers_cluster.merge(cluster_size, how = 'left', on ='clusters')
+clusters
+
+# Распределение Тотала по кластерам
+max_ = new_pivot['all_qty'].max()
+max_
+x_cluster = new_pivot[new_pivot['all_qty'] != max_].iloc[:,-1]
+y_cluster = new_pivot[new_pivot['all_qty'] != max_].iloc[:,-2]
+fig = plt.figure()
+axes = fig.add_axes([0, 1,2,1.5])
+scatter = plt.scatter(x_cluster, y_cluster)
+axes.set_title('Распределение средней закупки по кластерам')
+axes.set_xlabel('Number cluster')
+axes.set_ylabel('Amount AVG SKU')
+
+melt = pd.melt(clusters, id_vars = 'clusters', value_vars = clusters.iloc[:,1:].columns  )
+# Кластер №1
+c1 = melt[(melt['clusters'] == 0) & (melt['variable'] != 'count_consultans') & (melt['variable'] != 'all_qty')]
+c1 = c1.sort_values(ascending = False , by = 'value')
+fig = plt.figure()
+axes = fig.add_axes([0,2,2,2.5])
+c1_ = sns.barplot(y = c1['variable'], x = c1['value'], color = 'blue')
+plt.xlabel('Amount SKU')
+plt.ylabel('FG1')
+c1_.set_title("Claster Number 1")
+
+# Кластер №2
+c2 = melt[(melt['clusters'] == 1) & (melt['variable'] != 'count_consultans') & (melt['variable'] != 'all_qty')]
+c2 = c2.sort_values(ascending = False , by = 'value')
+fig = plt.figure()
+axes = fig.add_axes([0,2,2,2.5])
+c2_ = sns.barplot(y = c2['variable'], x = c2['value'], color = 'red')
+# plt.setp(ax.get_xticklabels(), rotation=45)
+plt.xlabel('Amount SKU')
+plt.ylabel('FG1')
+c2_.set_title("Claster Number 2")
+
+c3= melt[(melt['clusters'] == 2) & (melt['variable'] != 'count_consultans') & (melt['variable'] != 'all_qty')]
+c3 = c3.sort_values(ascending = False , by = 'value')
+fig = plt.figure()
+axes = fig.add_axes([0,2,2,2.5])
+c3_ = sns.barplot(y = c3['variable'], x = c3['value'], color = 'yellow')
+# plt.setp(ax.get_xticklabels(), rotation=45)
+plt.xlabel('Amount SKU')
+plt.ylabel('FG1')
+c3_.set_title("Claster Number 3")
+
+c4= melt[(melt['clusters'] == 3) & (melt['variable'] != 'count_consultans') & (melt['variable'] != 'all_qty')]
+c4 = c4.sort_values(ascending = False , by = 'value')
+fig = plt.figure()
+axes = fig.add_axes([0,2,2,2.5])
+c4_ = sns.barplot(y = c4['variable'], x = c4['value'], color = 'green')
+# plt.setp(ax.get_xticklabels(), rotation=45)
+plt.xlabel('Amount SKU')
+plt.ylabel('FG1')
+c4_.set_title("Claster Number 4")
+
+# Сравнение изменения структуры средней закупки в 21 и 22 году по кластерам
+def comparison_clusters():
+    # Рассмотрим кластеры в общем наборе данных
+    id = pd.DataFrame(pivot.iloc[:,0])
+    marker = pd.concat([id, new_pivot], axis = 1)
+    marker = marker[['id','clusters']]
+    data_cluster = df.merge(marker, how = 'left', on = 'id').fillna('del')
+    data_cluster = data_cluster[data_cluster['clusters'] != 'del']
+
+    # Год покупки
+    data_cluster['year'] = data_cluster['period'].apply(lambda x: str(x)[:4])
+    data_cluster['year'] = data_cluster['year'].astype(int)
+    # Группировка средней покупки 21 и 22 года по кластерам
+    data_21 = data_cluster[data_cluster['year'] == 2021 ].groupby(['clusters', 'fg1'])['qty'].mean().reset_index()
+    data_22 = data_cluster[data_cluster['year'] == 2022 ].groupby(['clusters', 'fg1'])['qty'].mean().reset_index()
+    data_21['key'] = data_21['clusters'].astype(str) + '-' + data_21['fg1']
+    data_22['key'] = data_22['clusters'].astype(str) + '-' + data_22['fg1']
+    # Объединение 21 и 22 года
+    c_data = data_22.merge(data_21[['key', 'qty']], on = 'key', how = 'left' )
+    c_data.isna().value_counts()
+    c_data = c_data.drop('key', axis = 1)
+    c_data.columns = 'cluster,fg1,qty21,qty22'.split(',')
+    c_data['delta'] = c_data['qty22'] - c_data['qty21']
+    # Изменение средней закупки по кластерам внутри ФГ1
+    c_dataMax = c_data['delta'].max()
+    c_dataMin = c_data['delta'].min()
+    print('Min: ', c_dataMin, "Max: ", c_dataMax)
+
+    return c_data
+comparison = comparison_clusters()
+comparison.head()
+
+
+
+
+    
+   
